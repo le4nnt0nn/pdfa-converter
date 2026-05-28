@@ -1,9 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>PdfAConverter</PackageId>
+    <Title>PdfAConverter</Title>
+    <Description>Small .NET library for converting PDF files to PDF/A through Ghostscript.</Description>
   </PropertyGroup>
 
 </Project>
