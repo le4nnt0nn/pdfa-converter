@@ -29,7 +29,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         try
         {
             await File.WriteAllTextAsync(pdfADefinitionPath, CreatePdfADefinition(iccProfilePath), Encoding.ASCII, cancellationToken).ConfigureAwait(false);
-            var output = await RunGhostscriptAsync(executablePath, normalizedInputPath, normalizedOutputPath, pdfADefinitionPath, options, cancellationToken).ConfigureAwait(false);
+            var output = await RunGhostscriptAsync(executablePath, normalizedInputPath, normalizedOutputPath, iccProfilePath, pdfADefinitionPath, options, cancellationToken).ConfigureAwait(false);
 
             if (!File.Exists(normalizedOutputPath))
             {
@@ -47,7 +47,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         }
     }
 
-    private static async Task<string> RunGhostscriptAsync( string executablePath, string inputPath, string outputPath, string pdfADefinitionPath, PdfAConversionOptions options, CancellationToken cancellationToken)
+    private static async Task<string> RunGhostscriptAsync(string executablePath, string inputPath, string outputPath, string iccProfilePath, string pdfADefinitionPath, PdfAConversionOptions options, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -58,7 +58,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
             CreateNoWindow = true
         };
 
-        foreach (var argument in BuildArguments(inputPath, outputPath, pdfADefinitionPath, options))
+        foreach (var argument in BuildArguments(inputPath, outputPath, iccProfilePath, pdfADefinitionPath, options))
         {
             startInfo.ArgumentList.Add(argument);
         }
@@ -102,9 +102,12 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
     private static IEnumerable<string> BuildArguments(
         string inputPath,
         string outputPath,
+        string iccProfilePath,
         string pdfADefinitionPath,
         PdfAConversionOptions options)
     {
+        yield return $"--permit-file-read={CreateGhostscriptPathList(inputPath, iccProfilePath, pdfADefinitionPath)}";
+        yield return $"--permit-file-write={Path.GetDirectoryName(outputPath)}";
         yield return $"-dPDFA={(int)options.Compliance}";
         yield return $"-dPDFACompatibilityPolicy={options.CompatibilityPolicy}";
         yield return "-dBATCH";
@@ -132,14 +135,16 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
                /ICCProfile ({{escapedProfilePath}}) def
                [ /_objdef {icc_PDFA} /type /stream /OBJ pdfmark
                [ {icc_PDFA} << /N 3 >> /PUT pdfmark
-               [ {icc_PDFA} ({{escapedProfilePath}}) (r) file /PUT pdfmark
-               [ /OutputIntent <<
+               [ {icc_PDFA} ({{escapedProfilePath}}) /PUTFILE pdfmark
+               [ /_objdef {OutputIntent_PDFA} /type /dict /OBJ pdfmark
+               [ {OutputIntent_PDFA} <<
                  /Type /OutputIntent
                  /S /GTS_PDFA1
                  /OutputConditionIdentifier (sRGB)
                  /Info (sRGB)
                  /DestOutputProfile {icc_PDFA}
                >> /PUT pdfmark
+               [ {Catalog} << /OutputIntents [ {OutputIntent_PDFA} ] >> /PUT pdfmark
                """;
     }
 
@@ -277,6 +282,13 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
             .Replace("\\", "\\\\", StringComparison.Ordinal)
             .Replace("(", "\\(", StringComparison.Ordinal)
             .Replace(")", "\\)", StringComparison.Ordinal);
+    }
+
+    private static string CreateGhostscriptPathList(params string[] paths)
+    {
+        var separator = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ";" : ":";
+
+        return string.Join(separator, paths.Select(path => Path.GetFullPath(path)));
     }
 
     private static void TryDelete(string path)
