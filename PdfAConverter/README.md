@@ -39,6 +39,35 @@ var result = await converter.ConvertAsync(
     });
 ```
 
+## Test app
+
+The repository includes `PdfAConverter.TestApp`, a small console app for trying a real conversion.
+
+From the solution folder:
+
+```powershell
+dotnet run --project .\PdfAConverter.TestApp -- "C:\temp\Document.pdf" "C:\temp\salida-pdfa.pdf" "C:\Program Files\gs\gs10.07.1\bin\gswin64c.exe"
+```
+
+You can also configure the same arguments for Visual Studio debugging in `PdfAConverter.TestApp/Properties/launchSettings.json`:
+
+```json
+{
+  "profiles": {
+    "PdfAConverter.TestApp": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\temp\\Document.pdf\" \"C:\\temp\\salida-pdfa.pdf\" \"C:\\Program Files\\gs\\gs10.07.1\\bin\\gswin64c.exe\""
+    }
+  }
+}
+```
+
+The three arguments are:
+
+1. Input PDF path.
+2. Output PDF/A path.
+3. Optional Ghostscript executable path.
+
 ## Notes
 
 This library performs conversion. For strict acceptance workflows, validate the generated file with a PDF/A validator such as veraPDF after conversion.
