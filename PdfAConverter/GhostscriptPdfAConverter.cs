@@ -115,7 +115,6 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         yield return "-dNOOUTERSAVE";
         yield return "-sDEVICE=pdfwrite";
         yield return "-sColorConversionStrategy=RGB";
-        yield return "-sProcessColorModel=DeviceRGB";
         yield return "-dEmbedAllFonts=true";
         yield return "-dSubsetFonts=true";
         yield return "-dCompressFonts=true";
