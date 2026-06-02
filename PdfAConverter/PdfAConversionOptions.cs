@@ -28,6 +28,11 @@ public sealed class PdfAConversionOptions
     public int CompatibilityPolicy { get; init; } = 1;
 
     /// <summary>
+    /// Ghostscript color conversion strategy. Common values are RGB, CMYK, Gray, and UseDeviceIndependentColor.
+    /// </summary>
+    public string ColorConversionStrategy { get; init; } = "RGB";
+
+    /// <summary>
     /// Whether an existing output file may be overwritten.
     /// </summary>
     public bool Overwrite { get; init; } = true;

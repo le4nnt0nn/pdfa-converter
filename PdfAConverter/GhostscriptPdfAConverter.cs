@@ -20,7 +20,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         var normalizedInputPath = NormalizeExistingFile(inputPath, nameof(inputPath));
         var normalizedOutputPath = NormalizeOutputPath(outputPath, options.Overwrite);
         var executablePath = ResolveGhostscriptExecutable(options.GhostscriptExecutablePath);
-        var iccProfilePath = ResolveIccProfile(options.IccProfilePath);
+        var iccProfilePath = ResolveIccProfile(options.IccProfilePath, executablePath);
         var tempDirectory = ResolveTemporaryDirectory(options.TemporaryDirectory);
         var pdfADefinitionPath = Path.Combine(tempDirectory, $"{Guid.NewGuid():N}-pdfa.ps");
 
@@ -114,7 +114,9 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         yield return "-dNOPAUSE";
         yield return "-dNOOUTERSAVE";
         yield return "-sDEVICE=pdfwrite";
-        yield return "-sColorConversionStrategy=RGB";
+        yield return $"-sColorConversionStrategy={options.ColorConversionStrategy}";
+        yield return "-dPreserveSeparation=false";
+        yield return "-dConvertCMYKImagesToRGB=true";
         yield return "-dEmbedAllFonts=true";
         yield return "-dSubsetFonts=true";
         yield return "-dCompressFonts=true";
@@ -131,19 +133,69 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
 
         return $$"""
                %!
+               [ /Title (PDF/A conversion)
+                 /DOCINFO pdfmark
+
                /ICCProfile ({{escapedProfilePath}}) def
+
                [ /_objdef {icc_PDFA} /type /stream /OBJ pdfmark
-               [ {icc_PDFA} << /N 3 >> /PUT pdfmark
-               [ {icc_PDFA} ({{escapedProfilePath}}) /PUTFILE pdfmark
+
+               [ {icc_PDFA}
+               <<
+                 systemdict /ColorConversionStrategy known {
+                   systemdict /ColorConversionStrategy get cvn dup /Gray eq {
+                     pop /N 1 false
+                   }{
+                     dup /RGB eq {
+                       pop /N 3 false
+                     }{
+                       /CMYK eq {
+                         /N 4 false
+                       }{
+                         true
+                       } ifelse
+                     } ifelse
+                   } ifelse
+                 } {
+                   true
+                 } ifelse
+
+                 {
+                   currentpagedevice /ProcessColorModel get
+                   dup /DeviceGray eq {
+                     pop /N 1
+                   }{
+                     dup /DeviceRGB eq {
+                       pop /N 3
+                     }{
+                       dup /DeviceCMYK eq {
+                         pop /N 4
+                       } {
+                         /ProcessColorModel cvx /rangecheck signalerror
+                       } ifelse
+                     } ifelse
+                   } ifelse
+                 } if
+               >> /PUT pdfmark
+
+               [
+               {icc_PDFA}
+               {ICCProfile (r) file} stopped
+               {
+                 cleartomark
+               }
+               {
+                 /PUT pdfmark
+
                [ /_objdef {OutputIntent_PDFA} /type /dict /OBJ pdfmark
                [ {OutputIntent_PDFA} <<
                  /Type /OutputIntent
                  /S /GTS_PDFA1
-                 /OutputConditionIdentifier (sRGB)
-                 /Info (sRGB)
                  /DestOutputProfile {icc_PDFA}
+                 /OutputConditionIdentifier (sRGB)
                >> /PUT pdfmark
                [ {Catalog} << /OutputIntents [ {OutputIntent_PDFA} ] >> /PUT pdfmark
+               } ifelse
                """;
     }
 
@@ -167,14 +219,14 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         throw new PdfAConversionException("Ghostscript executable was not found. Install Ghostscript or set PdfAConversionOptions.GhostscriptExecutablePath.");
     }
 
-    private static string ResolveIccProfile(string? configuredPath)
+    private static string ResolveIccProfile(string? configuredPath, string ghostscriptExecutablePath)
     {
         if (!string.IsNullOrWhiteSpace(configuredPath))
         {
             return NormalizeExistingFile(configuredPath, nameof(PdfAConversionOptions.IccProfilePath));
         }
 
-        foreach (var candidate in GetDefaultIccProfileCandidates())
+        foreach (var candidate in GetDefaultIccProfileCandidates(ghostscriptExecutablePath))
         {
             if (File.Exists(candidate))
             {
@@ -185,8 +237,13 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         throw new PdfAConversionException("An sRGB ICC profile was not found. Set PdfAConversionOptions.IccProfilePath to a valid ICC/ICM profile.");
     }
 
-    private static IEnumerable<string> GetDefaultIccProfileCandidates()
+    private static IEnumerable<string> GetDefaultIccProfileCandidates(string ghostscriptExecutablePath)
     {
+        foreach (var candidate in GetGhostscriptIccProfileCandidates(ghostscriptExecutablePath))
+        {
+            yield return candidate;
+        }
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             var systemRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
@@ -200,6 +257,24 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         yield return "/usr/share/color/icc/colord/sRGB.icc";
         yield return "/Library/ColorSync/Profiles/sRGB Profile.icc";
         yield return "/System/Library/ColorSync/Profiles/sRGB Profile.icc";
+    }
+
+    private static IEnumerable<string> GetGhostscriptIccProfileCandidates(string ghostscriptExecutablePath)
+    {
+        if (!Path.IsPathFullyQualified(ghostscriptExecutablePath))
+        {
+            yield break;
+        }
+
+        var executableDirectory = Path.GetDirectoryName(ghostscriptExecutablePath);
+        var ghostscriptRoot = Directory.GetParent(executableDirectory ?? string.Empty)?.FullName;
+        if (string.IsNullOrWhiteSpace(ghostscriptRoot))
+        {
+            yield break;
+        }
+
+        yield return Path.Combine(ghostscriptRoot, "iccprofiles", "default_rgb.icc");
+        yield return Path.Combine(ghostscriptRoot, "iccprofiles", "srgb.icc");
     }
 
     private static string ResolveTemporaryDirectory(string? configuredDirectory)
