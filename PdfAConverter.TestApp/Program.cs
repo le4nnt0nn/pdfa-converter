@@ -13,6 +13,10 @@ if (args.Length < 2)
 var inputPath = args[0];
 var outputPath = args[1];
 var ghostscriptPath = args.Length >= 3 ? args[2] : null;
+var colorConversionStrategy = args.Length >= 4 ? args[3] : "RGB";
+var compliance = args.Length >= 5 && Enum.TryParse<PdfACompliance>(args[4], ignoreCase: true, out var parsedCompliance)
+    ? parsedCompliance
+    : PdfACompliance.PdfA2b;
 
 IPdfAConverter converter = new GhostscriptPdfAConverter();
 
@@ -21,14 +25,16 @@ try
     var result = await converter.ConvertAsync(inputPath, outputPath,
         new PdfAConversionOptions
         {
-            Compliance = PdfACompliance.PdfA2b,
-            GhostscriptExecutablePath = ghostscriptPath
+            Compliance = compliance,
+            GhostscriptExecutablePath = ghostscriptPath,
+            ColorConversionStrategy = colorConversionStrategy
         });
 
     Console.WriteLine("Conversion completada correctamente.");
     Console.WriteLine($"Entrada: {result.InputPath}");
     Console.WriteLine($"Salida:  {result.OutputPath}");
     Console.WriteLine($"PDF/A:   {result.Compliance}");
+    Console.WriteLine($"Color:   {colorConversionStrategy}");
 
     if (!string.IsNullOrWhiteSpace(result.GhostscriptOutput))
     {
