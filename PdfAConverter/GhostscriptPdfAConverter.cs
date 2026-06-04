@@ -29,7 +29,16 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         try
         {
             await File.WriteAllTextAsync(pdfADefinitionPath, CreatePdfADefinition(iccProfilePath), Encoding.ASCII, cancellationToken).ConfigureAwait(false);
-            var output = await RunGhostscriptAsync(executablePath, normalizedInputPath, normalizedOutputPath, iccProfilePath, pdfADefinitionPath, options, cancellationToken).ConfigureAwait(false);
+
+            var invocation = new GhostscriptInvocation(
+                executablePath,
+                normalizedInputPath,
+                normalizedOutputPath,
+                iccProfilePath,
+                pdfADefinitionPath,
+                options);
+
+            var output = await RunGhostscriptAsync(invocation, cancellationToken).ConfigureAwait(false);
 
             if (!File.Exists(normalizedOutputPath))
             {
@@ -47,18 +56,18 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         }
     }
 
-    private static async Task<string> RunGhostscriptAsync(string executablePath, string inputPath, string outputPath, string iccProfilePath, string pdfADefinitionPath, PdfAConversionOptions options, CancellationToken cancellationToken)
+    private static async Task<string> RunGhostscriptAsync(GhostscriptInvocation invocation, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo
         {
-            FileName = executablePath,
+            FileName = invocation.ExecutablePath,
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
 
-        foreach (var argument in BuildArguments(inputPath, outputPath, iccProfilePath, pdfADefinitionPath, options))
+        foreach (var argument in BuildArguments(invocation))
         {
             startInfo.ArgumentList.Add(argument);
         }
@@ -99,22 +108,17 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         return output;
     }
 
-    private static IEnumerable<string> BuildArguments(
-        string inputPath,
-        string outputPath,
-        string iccProfilePath,
-        string pdfADefinitionPath,
-        PdfAConversionOptions options)
+    private static IEnumerable<string> BuildArguments(GhostscriptInvocation invocation)
     {
-        yield return $"--permit-file-read={CreateGhostscriptPathList(inputPath, iccProfilePath, pdfADefinitionPath)}";
-        yield return $"--permit-file-write={Path.GetDirectoryName(outputPath)}";
-        yield return $"-dPDFA={(int)options.Compliance}";
-        yield return $"-dPDFACompatibilityPolicy={options.CompatibilityPolicy}";
+        yield return $"--permit-file-read={CreateGhostscriptPathList(invocation.InputPath, invocation.IccProfilePath, invocation.PdfADefinitionPath)}";
+        yield return $"--permit-file-write={Path.GetDirectoryName(invocation.OutputPath)}";
+        yield return $"-dPDFA={(int)invocation.Options.Compliance}";
+        yield return $"-dPDFACompatibilityPolicy={invocation.Options.CompatibilityPolicy}";
         yield return "-dBATCH";
         yield return "-dNOPAUSE";
         yield return "-dNOOUTERSAVE";
         yield return "-sDEVICE=pdfwrite";
-        yield return $"-sColorConversionStrategy={options.ColorConversionStrategy}";
+        yield return $"-sColorConversionStrategy={invocation.Options.ColorConversionStrategy}";
         yield return "-dPreserveSeparation=false";
         yield return "-dConvertCMYKImagesToRGB=true";
         yield return "-dEmbedAllFonts=true";
@@ -122,9 +126,9 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         yield return "-dCompressFonts=true";
         yield return "-dDetectDuplicateImages=true";
         yield return "-dFastWebView=false";
-        yield return $"-sOutputFile={outputPath}";
-        yield return pdfADefinitionPath;
-        yield return inputPath;
+        yield return $"-sOutputFile={invocation.OutputPath}";
+        yield return invocation.PdfADefinitionPath;
+        yield return invocation.InputPath;
     }
 
     private static string CreatePdfADefinition(string iccProfilePath)
@@ -377,4 +381,12 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         catch
         { }
     }
+
+    private sealed record GhostscriptInvocation(
+        string ExecutablePath,
+        string InputPath,
+        string OutputPath,
+        string IccProfilePath,
+        string PdfADefinitionPath,
+        PdfAConversionOptions Options);
 }
