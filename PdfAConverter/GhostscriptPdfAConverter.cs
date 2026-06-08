@@ -40,13 +40,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
 
             var output = await RunGhostscriptAsync(invocation, cancellationToken).ConfigureAwait(false);
 
-            if (!File.Exists(normalizedOutputPath))
-            {
-                throw new PdfAConversionException("Ghostscript finished without creating the output PDF/A file.")
-                {
-                    GhostscriptOutput = output
-                };
-            }
+            EnsureOutputFileCreated(normalizedOutputPath, output);
 
             return new PdfAConversionResult(normalizedInputPath, normalizedOutputPath, options.Compliance, output);
         }
@@ -92,6 +86,17 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         }
 
         return output;
+    }
+
+    private static void EnsureOutputFileCreated(string outputPath, string ghostscriptOutput)
+    {
+        if (!File.Exists(outputPath))
+        {
+            throw new PdfAConversionException("Ghostscript finished without creating the output PDF/A file.")
+            {
+                GhostscriptOutput = ghostscriptOutput
+            };
+        }
     }
 
     private static ProcessStartInfo CreateStartInfo(GhostscriptInvocation invocation)
