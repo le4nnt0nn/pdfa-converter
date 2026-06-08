@@ -58,21 +58,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
 
     private static async Task<string> RunGhostscriptAsync(GhostscriptInvocation invocation, CancellationToken cancellationToken)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = invocation.ExecutablePath,
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        foreach (var argument in BuildArguments(invocation))
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = new Process { StartInfo = startInfo };
+        using var process = new Process { StartInfo = CreateStartInfo(invocation) };
         var outputBuilder = new StringBuilder();
 
         process.OutputDataReceived += (_, eventArgs) => AppendLine(outputBuilder, eventArgs.Data);
@@ -106,6 +92,25 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         }
 
         return output;
+    }
+
+    private static ProcessStartInfo CreateStartInfo(GhostscriptInvocation invocation)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = invocation.ExecutablePath,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        foreach (var argument in BuildArguments(invocation))
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        return startInfo;
     }
 
     private static IEnumerable<string> BuildArguments(GhostscriptInvocation invocation)
