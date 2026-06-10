@@ -16,6 +16,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
     public async Task<PdfAConversionResult> ConvertAsync(string inputPath, string outputPath, PdfAConversionOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= PdfAConversionOptions.Default;
+        ValidateOptions(options);
 
         var normalizedInputPath = NormalizeExistingFile(inputPath, nameof(inputPath));
         var normalizedOutputPath = NormalizeOutputPath(outputPath, options.Overwrite);
@@ -86,6 +87,17 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         }
 
         return output;
+    }
+
+    private static void ValidateOptions(PdfAConversionOptions options)
+    {
+        if (options.CompatibilityPolicy is < 0 or > 2)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.CompatibilityPolicy,
+                "CompatibilityPolicy must be 0, 1, or 2.");
+        }
     }
 
     private static void EnsureOutputFileCreated(string outputPath, string ghostscriptOutput)
