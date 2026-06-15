@@ -349,15 +349,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = executableName,
-                ArgumentList = { "--version" },
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
+            using var process = Process.Start(CreateVersionCheckStartInfo(executableName));
 
             process?.WaitForExit(2_000);
             return process?.HasExited == true && process.ExitCode == 0;
@@ -366,6 +358,19 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         {
             return false;
         }
+    }
+
+    private static ProcessStartInfo CreateVersionCheckStartInfo(string executableName)
+    {
+        return new ProcessStartInfo
+        {
+            FileName = executableName,
+            ArgumentList = { "--version" },
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
     }
 
     private static void AppendLine(StringBuilder builder, string? value)
