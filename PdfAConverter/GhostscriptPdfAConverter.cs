@@ -104,6 +104,11 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
 
     private static void ValidateOptions(PdfAConversionOptions options)
     {
+        if (string.IsNullOrWhiteSpace(options.ColorConversionStrategy))
+        {
+            throw new ArgumentException("ColorConversionStrategy cannot be empty.", nameof(options));
+        }
+
         if (options.CompatibilityPolicy is < 0 or > 2)
         {
             throw new ArgumentOutOfRangeException(
