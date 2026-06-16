@@ -74,7 +74,7 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        await WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
 
         var output = outputBuilder.ToString();
         if (process.ExitCode != 0)
@@ -87,6 +87,19 @@ public sealed class GhostscriptPdfAConverter : IPdfAConverter
         }
 
         return output;
+    }
+
+    private static async Task WaitForExitOrKillAsync(Process process, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!process.HasExited)
+        {
+            process.Kill(entireProcessTree: true);
+            throw;
+        }
     }
 
     private static void ValidateOptions(PdfAConversionOptions options)
